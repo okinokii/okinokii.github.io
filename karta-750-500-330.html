@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Магистральная энергосеть Украины — подстанции, ЛЭП и пункты импорта/экспорта</title>
+<style>
+  * { box-sizing: border-box; }
+  body { margin:0; font-family:"Segoe UI", Arial, sans-serif; color:#1a2b4a; background:#eef1f5; }
+  #app { display:flex; flex-wrap:wrap; min-height:100vh; }
+  #left { flex:1 1 660px; padding:18px; }
+  #right { flex:0 1 470px; background:#fff; border-left:1px solid #ccd; padding:18px; overflow:auto; max-height:100vh; }
+  h1 { font-size:20px; margin:0 0 4px; }
+  h3 { font-size:13px; margin:16px 0 6px; color:#334; text-transform:uppercase; letter-spacing:.4px; }
+  .sub { font-size:12px; color:#667; margin-bottom:12px; }
+  .mapwrap { background:#dceaf5; border:1px solid #b8c9d9; border-radius:8px; overflow:hidden; position:relative; }
+  svg { display:block; width:100%; height:auto; }
+  .legend { display:flex; flex-wrap:wrap; gap:10px 16px; font-size:11px; margin-top:10px; background:#fff; border:1px solid #dde; border-radius:6px; padding:9px 12px; }
+  .lg { display:flex; align-items:center; gap:6px; }
+  .dot { width:12px; height:12px; border-radius:50%; display:inline-block; flex:none; }
+  .dia { width:11px; height:11px; display:inline-block; flex:none; transform:rotate(45deg); border:1px solid #fff; }
+  .dot-op{background:#d62728} .dot-npp{background:#1f77b4} .dot-proj{background:#ff7f0e} .dot-old{background:#777}
+  .dot-500{background:#9467bd} .dot-330{background:#17becf}
+  .dia-act{background:#2ca02c} .dia-prj{background:#ff7f0e} .dia-old{background:#999}
+  .ln { width:20px; border-top:3px solid #d62728; display:inline-block; flex:none; }
+  .ln-500{ width:20px; border-top:3px solid #9467bd; display:inline-block; flex:none; }
+  .ln-330{ width:20px; border-top:3px solid #17becf; display:inline-block; flex:none; }
+  .ln-border{ width:20px; border-top:3px solid #2ca02c; display:inline-block; flex:none; }
+  .ln-prj { width:20px; border-top:2px dashed #ff7f0e; display:inline-block; flex:none; }
+  .ln-old { width:20px; border-top:2px dashed #999; display:inline-block; flex:none; }
+  .zoom { position:absolute; right:10px; top:10px; display:flex; flex-direction:column; gap:4px; }
+  .zoom button { width:32px; height:32px; font-size:18px; cursor:pointer; border:1px solid #99a; background:#fff; border-radius:4px; }
+  #info { background:#f7f9fc; border:1px solid #dde; border-radius:6px; padding:12px; margin-bottom:8px; font-size:12.5px; line-height:1.5; min-height:130px; }
+  #info h2 { font-size:15px; margin:0 0 8px; color:#1a2b4a; }
+  #info .k { color:#667; }
+  table { width:100%; border-collapse:collapse; font-size:11px; }
+  th,td { text-align:left; padding:5px 4px; border-bottom:1px solid #e5e8ec; vertical-align:top; }
+  th { background:#eef1f5; position:sticky; top:0; }
+  tr:hover td { background:#fffbe6; cursor:pointer; }
+  .status { font-size:9.5px; padding:2px 5px; border-radius:3px; white-space:nowrap; }
+  .st-op{background:#fde8e8;color:#a11}.st-npp{background:#e3f0fb;color:#06c}.st-proj{background:#fff0e0;color:#c60}.st-old{background:#eee;color:#555}
+  .st-border{background:#e6f7e9;color:#178}.st-bprj{background:#fff0e0;color:#c60}.st-bold{background:#eee;color:#666}
+  .st-500{background:#efe8f8;color:#639}.st-330{background:#e3f6fa;color:#078}
+  .note { font-size:11px; color:#667; line-height:1.45; margin-top:14px; border-top:1px solid #dde; padding-top:10px; }
+  .note b { color:#1a2b4a; }
+  .marker { cursor:pointer; }
+  .marker:hover circle, .marker:hover rect { stroke-width:4; }
+  .lbl { font-size:9px; fill:#223; paint-order:stroke; stroke:#fff; stroke-width:2.5px; stroke-linejoin:round; pointer-events:none; }
+  .st-label { font-size:11px; fill:#334; }
+  .kv-label { font-size:8.5px; fill:#166; paint-order:stroke; stroke:#fff; stroke-width:2px; pointer-events:none; }
+  @media(max-width:900px){ #right{flex:1 1 100%; max-height:none; border-left:none; border-top:1px solid #ccd;} }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="left">
+    <h1>Магистральная энергосеть Украины</h1>
+    <div class="sub">Автономная карта — без API-ключей внешних сервисов. Подстанции и ЛЭП 750 / 500 / 330 кВ, межгосударственные линии и пункты импорта/экспорта. Сборка: ноябрь 2026.</div>
+
+    <div class="mapwrap">
+      <svg id="map" viewBox="0 0 900 620" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Карта магистральной энергосети Украины">
+        <rect x="0" y="0" width="900" height="620" fill="#e8f2fa"/>
+        <g id="grid"></g>
+        <g id="country"></g>
+        <g id="linesDom"></g>
+        <g id="lines500"></g>
+        <g id="lines330"></g>
+        <g id="linesBorder"></g>
+        <g id="markers"></g>
+        <g id="labels"></g>
+      </svg>
+      <div class="zoom">
+        <button id="zin" title="Приблизить">+</button>
+        <button id="zout" title="Отдалить">−</button>
+        <button id="zreset" title="Сброс" style="font-size:11px;">⤢</button>
+      </div>
+    </div>
+
+    <div class="legend">
+      <div class="lg"><span class="dot dot-op"></span> ПС 750 кВ (Укренерго)</div>
+      <div class="lg"><span class="dot dot-npp"></span> ОРУ 750 кВ АЭС</div>
+      <div class="lg"><span class="dot dot-proj"></span> ПС проект / стройка</div>
+      <div class="lg"><span class="dot dot-old"></span> ПС выведенная</div>
+      <div class="lg"><span class="dot dot-500"></span> ПС 500 кВ</div>
+      <div class="lg"><span class="dot dot-330"></span> ПС 330 кВ</div>
+      <div class="lg"><span class="dia dia-act"></span> пункт импорта/экспорта (действ.)</div>
+      <div class="lg"><span class="dia dia-prj"></span> пограничный пункт (проект)</div>
+      <div class="lg"><span class="dia dia-old"></span> исторический пограничный пункт</div>
+      <div class="lg"><span class="ln"></span> ЛЭП 750 кВ (внутри страны)</div>
+      <div class="lg"><span class="ln ln-500"></span> ЛЭП 500 кВ</div>
+      <div class="lg"><span class="ln ln-330"></span> ЛЭП 330 кВ</div>
+      <div class="lg"><span class="ln-border"></span> межгос. ЛЭП (действ.)</div>
+      <div class="lg"><span class="ln-prj"></span> межгос. ЛЭП (проект)</div>
+      <div class="lg"><span class="ln-old"></span> межгос. ЛЭП (историческая)</div>
+    </div>
+
+    <div class="note">
+      <b>Точность.</b> где в открытых источниках нет точных координат, маркер поставлен по населённому пункту из проектной/тендерной документации (погрешность до нескольких км) — указано в карточке.<br>
+      <b>Статус.</b> Донбасская, Южнодонбасская, Каховская и Запорожская АЭС находятся в зоне боевых действий / оккупации — текущее состояние требует уточнения.<br>
+      <b>Границы.</b> Межгосударственные линии показаны от подстанции на территории Украины до точки присоединения в соседней стране. Исторические направления (СССР/«Мир») отмечены серым пунктиром.<br>
+      Источники: uk/en.wikipedia.org, НЕК «Укренерго», zakon.rada.gov.ua, OpenStreetMap/Nominatim, тендерная и проектная документация.
+    </div>
+  </div>
+
+  <div id="right">
+    <div id="info">
+      <h2>Выберите объект на карте или в таблице</h2>
+      <div class="k">Круги — подстанции и ОРУ 750/500/330 кВ; ромбы — пограничные пункты приёма/передачи электроэнергии. Линии: красные — 750 кВ, фиолетовые — 500 кВ, бирюзовые — 330 кВ, зелёные — действующие межгосударственные, оранжевые/серые пунктиры — проекты и история.</div>
+    </div>
+    <h3>Подстанции и ОРУ 750 / 500 / 330 кВ</h3>
+    <table id="tblSt"><thead><tr><th>Название</th><th>Регион</th><th>Статус</th></tr></thead><tbody></tbody></table>
+    <h3>Пункты импорта / экспорта</h3>
+    <table id="tblB"><thead><tr><th>Пункт</th><th>Страна</th><th>кВ</th><th>Статус</th></tr></thead><tbody></tbody></table>
+  </div>
+</div>
+
+<script>
+// === Граница Украины (упрощённый GeoJSON, world.geo.json) ===
+const UKRAINE = [[31.785998,52.101678],[32.159412,52.061267],[32.412058,52.288695],[32.715761,52.238465],[33.7527,52.335075],[34.391731,51.768882],[34.141978,51.566413],[34.224816,51.255993],[35.022183,51.207572],[35.377924,50.773955],[35.356116,50.577197],[36.626168,50.225591],[37.39346,50.383953],[38.010631,49.915662],[38.594988,49.926462],[40.069058,49.601055],[40.080789,49.30743],[39.674664,48.783818],[39.895632,48.232405],[39.738278,47.898937],[38.770585,47.825608],[38.255112,47.5464],[38.223538,47.10219],[37.425137,47.022221],[36.759855,46.6987],[35.823685,46.645964],[34.962342,46.273197],[35.020788,45.651219],[35.510009,45.409993],[36.529998,45.46999],[36.334713,45.113216],[35.239999,44.939996],[33.882511,44.361479],[33.326421,44.564877],[33.546924,45.034771],[32.454174,45.327466],[32.630804,45.519186],[33.588162,45.851569],[33.298567,46.080598],[31.74414,46.333348],[31.675307,46.706245],[30.748749,46.5831],[30.377609,46.03241],[29.603289,45.293308],[29.149725,45.464925],[28.679779,45.304031],[28.233554,45.488283],[28.485269,45.596907],[28.659987,45.939987],[28.933717,46.25883],[28.862972,46.437889],[29.072107,46.517678],[29.170654,46.379262],[29.759972,46.349988],[30.024659,46.423937],[29.83821,46.525326],[29.908852,46.674361],[29.559674,46.928583],[29.415135,47.346645],[29.050868,47.510227],[29.122698,47.849095],[28.670891,48.118149],[28.259547,48.155562],[27.522537,48.467119],[26.857824,48.368211],[26.619337,48.220726],[26.19745,48.220881],[25.945941,47.987149],[25.207743,47.891056],[24.866317,47.737526],[24.402056,47.981878],[23.760958,47.985598],[23.142236,48.096341],[22.710531,47.882194],[22.64082,48.15024],[22.085608,48.422264],[22.280842,48.825392],[22.558138,49.085738],[22.776419,49.027395],[22.51845,49.476774],[23.426508,50.308506],[23.922757,50.424881],[24.029986,50.705407],[23.527071,51.578454],[24.005078,51.617444],[24.553106,51.888461],[25.327788,51.910656],[26.337959,51.832289],[27.454066,51.592303],[28.241615,51.572227],[28.617613,51.427714],[29.0,51.3]];
+
+// === Подстанции / ОРУ 750 кВ ===
+const STATIONS = [
+  {key:"zah",name:"Західноукраїнська",short:"Західноукраїнська",ru:"ПС 750 кВ «Западноукраинская»",region:"Львовская обл., с. Жирова",lat:49.38639,lon:24.24917,type:"op",accuracy:"точные (Wikipedia)",info:"Крупнейшая ПС Украины и Европы: 750/330/35 кВ, 3000 МВА, 3 группы однофазных автотрансформаторов, ~70 га. Введена в 1980 г. Ключевой узел коридора «Мир» и интерконнектора с ENTSO-E."},
+  {key:"vin",name:"Вінницька",short:"Винницкая",ru:"ПС 750 кВ «Винницкая»",region:"Винницкая обл., с. Комарів",lat:49.16500,lon:28.72306,type:"op",accuracy:"~2 км (Wikipedia)",info:"750/330/110/10 кВ, ~1124 МВА. Самая мощная ПС Юго-Западной энергосистемы. Связана с Захидноукраинской (479 км). Реконструкция с 2021 г."},
+  {key:"kyi",name:"Київська",short:"Киевская",ru:"ПС 750 кВ «Киевская»",region:"Киевская обл., с. Наливайківка / Макарів",lat:50.48368,lon:29.71113,type:"op",accuracy:"приблизительно (с. Наливайківка)",info:"Узловая ПС Киевского энергокольца: 750/330/10 кВ, 2000 МВА, 2 группы по 999 МВА, >52 га. 1-я очередь — 2008 г.; расширения 2012–2018. Принята ЛЭП 750 кВ от Ровенской АЭС (2015, 353 км)."},
+  {key:"pivn",name:"Північноукраїнська",short:"Північноукраїнська",ru:"ПС 750 кВ «Северноукраинская»",region:"Сумская обл., Роменский р-н, с. Заруддя",lat:50.70225,lon:33.73043,type:"op",accuracy:"~1–2 км (с. Заруддя по тендеру)",info:"Подстанция 750 кВ в Сумской области (Зарудянская громада). Оборудование ВРП-750 кВ проходит техническое переоснащение (тендеры Укренерго). Северный узел энергокольца; точная конфигурация присоединения к Київской уточняется по открытым схемам."},
+  {key:"dnp",name:"Дніпровська",short:"Днепровская",ru:"ПС 750 кВ «Днепровская»",region:"Днепропетровская обл., г. Вольногорск",lat:48.49365,lon:34.02328,type:"op",accuracy:"приблизительно (г. Вольногорск)",info:"Ключевой транзитный узел Приднепровья. Адрес по тендеру: 9-й км дороги Вольногорск–Божедаровка. Реконструкция ВРП 750/330/110/35 кВ."},
+  {key:"zap",name:"Запорізька",short:"Запорожская",ru:"ПС 750 кВ «Запорожская»",region:"Запорожская обл., с. Значкове",lat:47.97729,lon:35.51502,type:"op",accuracy:"приблизительно (с. Значкове)",info:"Обеспечивает выдачу мощности ЗАЭС и транзит в узлы 750 кВ «Днепровская» и «Донбасская», а также на ПС 330 кВ востока и юга Украины."},
+  {key:"don",name:"Донбаська",short:"Донбасская",ru:"ПС 750 кВ «Донбасская»",region:"Донецкая обл., Бахмутский р-н, с. Весела Долина",lat:48.55016,lon:38.06576,type:"op",accuracy:"приблизительно (с. Весела Долина)",info:"750/500/330 кВ. Восточный опорный узел ОЕС. Связана ЛЭП 750 кВ с ПС Південнодонбаська (212,83 км). Территория боевых действий — статус требует уточнения."},
+  {key:"pdd",name:"Південнодонбаська",short:"Южнодонбасская",ru:"ПС 750 кВ «Южнодонбасская»",region:"Донецкая обл., Волновахский р-н, с. Пільне",lat:47.75175,lon:37.50934,type:"op",accuracy:"приблизительно (ж/д ст. Південнодонбаська)",info:"ЛЭП 750 кВ до ПС Донбасская (212,83 км) и до ЗАЭС. Построена как часть транзита ЗАЭС–Каховская. Территория боевых действий."},
+  {key:"riv",name:"Рівненська АЕС",short:"Ровенская АЭС",ru:"ОРУ 750 кВ Ровенской АЭС",region:"Ровенская обл., г. Нетишин",lat:51.326857,lon:25.890634,type:"npp",accuracy:"точные",info:"ОРУ 750 кВ Ровенской АЭС (4 блока ВВЭР-1000). ЛЭП 750 кВ на Західноукраїнська (1981) и Київська (2015, 353 км)."},
+  {key:"khm",name:"Хмельницька АЕС",short:"Хмельницкая АЭС",ru:"ОРУ 750 кВ Хмельницкой АЭС",region:"Хмельницкая обл., г. Славута",lat:50.302512,lon:26.647875,type:"npp",accuracy:"точные",info:"ОРУ 750 кВ Хмельницкой АЭС. Три линии 750 кВ: на Київська, Західноукраїнська (1987) и историческая на Жешув (Польша, сейчас 400 кВ)."},
+  {key:"pua",name:"Південноукраїнська АЕС",short:"Южно-Укр. АЭС",ru:"ОРУ 750 кВ Южно-Украинской АЭС",region:"Николаевская обл., г. Южноукраинск",lat:47.82000,lon:31.22861,type:"npp",accuracy:"точные",info:"ОРУ 750 кВ Южно-Украинской АЭС (3 блока ВВЭР-1000). Историческая ЛЭП 750 кВ на Исакчу–Варну демонтирована. Перспектива — интерконнектор 400 кВ через Приморскую."},
+  {key:"zae",name:"Запорізька АЭС",short:"Запорожская АЭС",ru:"ОРУ 750 кВ Запорожской АЭС",region:"Запорожская обл., г. Энергодар",lat:47.5125684,lon:34.5894872,type:"npp",accuracy:"точные",info:"Крупнейшая АЭС Европы (6 ВВЭР-1000). Четыре линии 750 кВ и одна 330 кВ. С 2022 г. — под оккупацией, доступ ограничен (данные МАГАТЕ)."},
+  {key:"kah",name:"Каховська",short:"Каховская",ru:"ПС 750 кВ «Каховская»",region:"Херсонская обл., г. Новая Каховка",lat:46.75834,lon:33.35667,type:"proj",accuracy:"приблизительно",info:"Строящаяся ПС 750 кВ (1000 МВА, ~27,6 га) в рамках «Южного полукольца». ЛЭП 750 кВ ЗАЭС–Каховская (186 км) введена. Территория оккупирована."},
+  {key:"pry",name:"Приморська",short:"Приморская",ru:"ПС 750 кВ «Приморская»",region:"Одесская обл., Лиманская община",lat:46.66185,lon:29.97608,type:"proj",accuracy:"приблизительно (с. Лиманське)",info:"Проектируемая ПС 750/400/330 кВ — ключевой элемент «Южного полукольца» и интерконнектора 400 кВ Приморская–Вулканешты–Исакча. Согласование земель в 2024–2026 гг."},
+  {key:"chn",name:"Чорнобильська АЭС",short:"Чернобыльская АЭС",ru:"ОРУ 750 кВ Чернобыльской АЭС",region:"Киевская обл., г. Чернобыль",lat:51.38900,lon:30.09900,type:"old",accuracy:"приблизительно (ЧАЭС)",info:"Исторический узел 750 кВ. Линия 750 кВ Хмельницкая АЭС–Чернобыль после остановки ЧАЭС использована как заход на ПС Київская (2016, 129,7 км). ОРУ 750 кВ выведено из работы."},
+  // 500 кВ и 330 кВ
+  {key:"krem",name:"Кремінська",short:"Кремінська 500",ru:"ПС 500 кВ «Кремінська»",region:"Луганская обл., г. Кремінна",lat:49.04632,lon:38.21785,type:"kv500",accuracy:"~1 км (г. Кремінна)",info:"Первая новая ПС 500 кВ в современной Украине: 501 МВА, 4 автотрансформатора 500/220/35 кВ. Присоединена к ЛЭП 500 кВ «Донбаська — Донська». Территория боевых действий."},
+  {key:"don500",name:"Донська (RF)",short:"Донська 500 (RF)",ru:"ПС 500 кВ «Донская» (RF)",region:"Ростовская обл., РФ (у границы)",lat:47.74682,lon:39.94510,type:"kv500",accuracy:"~2 км (г. Новошахтинск)",info:"Восточный конец ЛЭП 500 кВ «Донбаська — Донська». С 2022 г. связь с ОЕС Украины прервана."},
+  {key:"mikh",name:"Михайлівська",short:"Михайлівська ВПТ",ru:"ПС «Михайлівська» (ВПТ 800 кВ)",region:"Донецкая обл., Покровский р-н",lat:48.13119,lon:37.38613,type:"old",accuracy:"~2 км (с. Михайлівка)",info:"Украинская преобразовательная подстанция ВПТ «Волгоград — Донбасс» (475 км, ±400 кВ, 750 МВт, 1962–2014). Линия не работает."},
+  {key:"kh330",name:"Харківська 330",short:"Харківська 330",ru:"ПС 330 кВ «Харківська»",region:"г. Харьков",lat:49.99232,lon:36.23101,type:"kv330",accuracy:"точные (г. Харьков)",info:"Магистральный узел 330 кВ Харькова. Реконструкция ОРУ 330/110/35 кВ Укренерго."},
+  {key:"zal",name:"Залютине",short:"Залютине",ru:"ПС 330 кВ «Залютине»",region:"г. Харьков, Новобаварский р-н",lat:49.96710,lon:36.16198,type:"kv330",accuracy:"~1 км",info:"Узел 330 кВ Харькова; реконструкция ОРУ вместе с ПС «Харківська»."},
+  {key:"novk",name:"Новокиївська",short:"Новокиївська",ru:"ПС 330 кВ «Новокиївська»",region:"Киевская обл., г. Фастов",lat:50.07462,lon:29.93787,type:"kv330",accuracy:"~1 км (г. Фастов)",info:"Узел 330 кВ; реконструкция ОРУ 330/110 кВ с заменой на элегазовые КРПЕ."},
+  {key:"zah330",name:"Західна 330",short:"Західна 330",ru:"ПС 330 кВ «Західна»",region:"Киевская обл., с. Гореничі",lat:50.41933,lon:30.21149,type:"proj",accuracy:"~1 км (с. Гореничі)",info:"Новая ПС 330/110/35 кВ с заходами ЛЭП 330 кВ, по Плану развития системы передач на 2021–2030 гг."},
+  {key:"riv330",name:"Рівне 330",short:"Рівне 330",ru:"ПС 330 кВ «Рівне»",region:"г. Ровно",lat:50.61962,lon:26.25132,type:"kv330",accuracy:"~1 км (г. Ровно)",info:"Узел Западной энергосистемы; введён автотрансформатор 200 МВА 330/110 кВ."},
+  {key:"loz",name:"Лозова",short:"Лозова",ru:"ПС 330 кВ «Лозова»",region:"Харьковская обл., г. Лозовая",lat:48.88424,lon:36.31603,type:"kv330",accuracy:"~1 км (г. Лозовая)",info:"Магистральный узел 330 кВ Харьковской области."},
+  {key:"mel",name:"Мелітопольська",short:"Мелітополь 330",ru:"ПС 330 кВ «Мелітопольська»",region:"Запорожская обл., г. Мелитополь",lat:46.84673,lon:35.38273,type:"kv330",accuracy:"~1 км (г. Мелитополь)",info:"Узел 330 кВ; реконструкция для подключения линии 330 кВ от Запорожской ВЭС. Территория оккупирована."},
+  {key:"noo",name:"Новоодеська",short:"Новоодеська",ru:"ПС 330 кВ «Новоодеська»",region:"Николаевская обл., г. Новая Одесса",lat:47.31100,lon:31.77397,type:"kv330",accuracy:"~1 км (г. Новая Одесса)",info:"Северный конец строящейся ЛЭП 330 кВ «Новоодеська — Арциз» (~104 км, 20 км через Днестровские плавни)."}
+];
+
+// === Пограничные пункты импорта/экспорта ===
+// side: украинская и соседние стороны indicated in `country`
+const BORDER = [
+  {key:"dobr",name:"Добротвір",short:"Добротвір",ru:"ПС/ТЕС «Добротвір» (UA)",country:"Украина → Польша",kv:"220 кВ",lat:50.20534,lon:24.38557,type:"border",accuracy:"точные (Nominatim, п. Добротвір)",info:"Украинский конец линии 220 кВ Добротвір–Замость. 30 марта 2022 г. по ней возобновлён экспорт электроэнергии в Польшу (первый экспорт после синхронизации с ENTSO-E). Исторически — одна из точек связи ОЕС Украины с польской системой."},
+  {key:"zamo",name:"Замость",short:"Замость (PL)",ru:"Zamość (PL)",country:"Польша",kv:"220 кВ",lat:50.71709,lon:23.25257,type:"border",accuracy:"точные (Nominatim, г. Замость)",info:"Польский конец линии 220 кВ Добротвір–Замость. Маркер поставлен по городу Замость — уточнение точной подстанции требует дополнительных данных."},
+  {key:"rz",name:"Жешув",short:"Жешув (PL)",ru:"Rzeszów (PL)",country:"Польша",kv:"400 кВ",lat:50.03745,lon:22.00472,type:"border",accuracy:"точные (Nominatim, г. Жешув)",info:"Польский конец линии Хмельницька АЕС–Жешув. Изначально строилась как ЛЭП 750 кВ в рамках системы «Мир», сейчас работает на 400 кВ. Тестовый режим с 27 апреля 2023 г.; реконструкция (~263,8 млн грн) завершена в 2023 г."},
+  {key:"muk",name:"Мукачево",short:"Мукачево",ru:"ПС 400 кВ «Мукачево» (UA)",country:"Украина → Словакия",kv:"400 кВ",lat:48.44211,lon:22.71854,type:"border",accuracy:"точные (Nominatim, г. Мукачево)",info:"Украинский конец межгосударственной ЛЭП 400 кВ Мукачево–Веľké Kapušany (Словакия). Один из ключевых интерконнекторов с ENTSO-E; линия построена в 1963 г., срок эксплуатации >50 лет, реконструкция с заменой проводов планируется до конца 2028 г."},
+  {key:"vkap",name:"Вельке Капушани",short:"В. Капушани (SK)",ru:"Veľké Kapušany (SK)",country:"Словакия",kv:"400 кВ",lat:48.55388,lon:22.07737,type:"border",accuracy:"точные (Nominatim)",info:"Словацкий конец линии 400 кВ Мукачево–Веľké Kapušany. Через этот переход «остров Бурштинской ТЭС» работал синхронно с ENTSO-E с 2002 г.; после 16 марта 2022 г. — в составе объединённой синхронной зоны. Планируется новая ПС 400/110 кВ «Ужгород» с заходом линии."},
+  {key:"szab",name:"Саболчбака",short:"Саболчбака (HU)",ru:"Szabolcsbáka (HU)",country:"Венгрия",kv:"750/400 кВ",lat:48.15722,lon:22.13959,type:"border",accuracy:"точные (Nominatim)",info:"Венгерский конец линии Західноукраїнська–Саболчбака. Українська ділянка до кордону — 750 кВ; участок Саболчбака–Альбертірша переведён на 400 кВ. В 2017–2020 гг. в Венгрии построена новая ПС 750/400 кВ для стыковки. Переход работал на Бурштынский остров, сейчас — в общей синхронной зоне."},
+  {key:"isac",name:"Ісакча",short:"Ісакча (RO)",ru:"Isaccea (RO)",country:"Румыния",kv:"750 кВ (ист.) / 400 кВ (проект)",lat:45.27219,lon:28.45715,type:"border_old",accuracy:"точные (Nominatim)",info:"Румынский конец исторической ЛЭП 750 кВ Південноукраїнська АЕС–Ісакча–Варна (система «Мир»). Линия в основном демонтирована/разобрана; сохранились отдельные участки и переход через Дунай. Перспектива — новый интерконнектор 400 кВ Приморська–Вулканешты–Ісакча."},
+  {key:"vulc",name:"Вулканешти",short:"Вулканешты (MD)",ru:"Vulcănești (MD)",country:"Молдова",kv:"400 кВ (проект)",lat:45.68240,lon:28.40221,type:"border_proj",accuracy:"точные (Nominatim)",info:"Промежуточная точка проектируемого интерконнектора 400 кВ Приморська–Вулканешты–Ісакча (Южное полукольцо). Маркер по г. Вулканешты (Гагаузия); точное местоположение подстанции уточняется проектной документацией."},
+  {key:"arc",name:"Арциз",short:"Арциз",ru:"ПС 330 кВ «Арциз» (UA)",country:"Украина → Молдова",kv:"330 кВ",lat:45.99620,lon:29.43152,type:"border",accuracy:"точные (Nominatim, г. Арциз)",info:"Украинский конец ЛЭП 330 кВ Молдавская ГРЭС (Днестровск)–Арциз, протяжённостью 104,38 км. Основной канал выдачи/импорта между ОЕС Украины и Молдовой; экспорт в Молдову возобновлён 12 мая 2022 г. Ведутся работы по реконструкции участка и строительству ЛЭП 330 кВ Новоодеська–Арциз."},
+  {key:"mgres",name:"Молдавская ГРЭС",short:"Молд. ГРЭС (MD)",ru:"Moldavska GRES / Днестровск (MD)",country:"Молдова (Приднестровье)",kv:"330 кВ",lat:46.63454,lon:29.93720,type:"border",accuracy:"точные (Nominatim)",info:"Молдавский конец линии 330 кВ Молдавская ГРЭС–Арциз. Крупная ТЭС в Днестровске; через Арциз связана с энергосистемой Украины, в т.ч. по экспорту украинской электроэнергии в Молдову с мая 2022 г."}
+];
+
+// === Линии: [ключ A, ключ B, категория, напряжение, статус, подпись] ===
+// категория: dom (внутри страны), border (межгосударственная)
+// статус: active, project, old
+const LINES = [
+  // ----- Внутри страны, 750 кВ -----
+  ["zah","riv","dom","750","active","750"],
+  ["zah","khm","dom","750","active","750"],
+  ["zah","vin","dom","750","active","750"],
+  ["vin","kyi","dom","750","active","750"],
+  ["riv","kyi","dom","750","active","750"],
+  ["khm","kyi","dom","750","active","750"],
+  ["khm","chn","dom","750","old","750 (ист.)"],
+  ["kyi","pivn","dom","750","active","750"],
+  ["vin","pua","dom","750","active","750"],
+  ["pua","dnp","dom","750","active","750"],
+  ["dnp","zap","dom","750","active","750"],
+  ["zae","zap","dom","750","active","750"],
+  ["zap","don","dom","750","active","750"],
+  ["zae","pdd","dom","750","active","750"],
+  ["pdd","don","dom","750","active","750"],
+  ["zae","kah","dom","750","active","750"],
+  ["kah","pry","dom","750","project","750 (проект)"],
+  ["pua","pry","dom","750","project","750 (проект)"],
+  // ----- Межгосударственные -----
+  ["dobr","zamo","border","220","active","220 → PL"],
+  ["khm","rz","border","400","active","400 → PL"],
+  ["muk","vkap","border","400","active","400 → SK"],
+  ["zah","szab","border","750","active","750 → HU"],
+  ["mgres","arc","border","330","active","330 → UA"],
+  ["pua","isac","border","750","old","750 (ист.) → RO"],
+  ["pry","vulc","border","400","project","400 (проект)"],
+  ["vulc","isac","border","400","project","400 (проект)"],
+  // ----- Внутри страны, 500 кВ -----
+  ["don","krem","500","500","active","500"],
+  ["krem","don500","border","500","old","500 (ист.) → RF"],
+  // ----- Внутри страны, 330 кВ -----
+  ["kh330","zal","330","330","active","330"],
+  ["kyi","novk","330","330","active","330"],
+  ["kyi","zah330","330","330","active","330"],
+  ["chn","kyi","330","330","active","330"],
+  ["noo","arc","330","330","project","330 (проект)"],
+  ["zap","mel","330","330","active","330"],
+  ["riv330","riv","330","330","active","330"],
+  ["don","kh330","330","330","old","330 (ист.)"]
+];
+
+const COLOR={op:"#d62728",npp:"#1f77b4",proj:"#ff7f0e",old:"#777",border:"#2ca02c",border_proj:"#ff7f0e",border_old:"#999",kv500:"#9467bd",kv330:"#17becf"};
+const STATUS={op:"действующая",npp:"ОРУ АЭС",proj:"проект / стройка",old:"выведена",border:"импорт/экспорт (действ.)",border_proj:"пограничный пункт (проект)",border_old:"исторический пункт",kv500:"ПС 500 кВ",kv330:"ПС 330 кВ"};
+const CLS={op:"st-op",npp:"st-npp",proj:"st-proj",old:"st-old",border:"st-border",border_proj:"st-bprj",border_old:"st-bold",kv500:"st-500",kv330:"st-330"};
+
+// === Проекция ===
+const W=900,H=620,PAD=26;
+const LON0=21.6, LON1=40.6, LAT0=44.0, LAT1=52.6;
+const COS=Math.cos(48*Math.PI/180);
+function pr(lon,lat){
+  const xs=(LON1-LON0)*COS, ys=(LAT1-LAT0);
+  return [ (lon*COS-LON0*COS)/xs*(W-2*PAD)+PAD, (LAT1-lat)/ys*(H-2*PAD)+PAD ];
+}
+const svgNS="http://www.w3.org/2000/svg";
+function el(tag,attrs,parent){const e=document.createElementNS(svgNS,tag);for(const k in attrs)e.setAttribute(k,attrs[k]);if(parent)parent.appendChild(e);return e;}
+
+// сетка
+const grid=document.getElementById("grid");
+for(let lat=44;lat<=52;lat+=2){const [x1,y]=pr(LON0,lat),[x2]=pr(LON1,lat);el("line",{x1,y1:y,x2,y2:y,stroke:"#cbdce9","stroke-width":1,opacity:.6},grid);el("text",{x:x1+3,y:y-3,class:"st-label",opacity:.55},grid).textContent=lat+"°N";}
+for(let lon=22;lon<=40;lon+=4){const [x,y1]=pr(lon,LAT0),[,y2]=pr(lon,LAT1);el("line",{x1:x,y1:y1,x2:x,y2:y2,stroke:"#cbdce9","stroke-width":1,opacity:.6},grid);el("text",{x:x+2,y:y2+12,class:"st-label",opacity:.55},grid).textContent=lon+"°E";}
+
+// контур страны
+const country=document.getElementById("country");
+const pts=UKRAINE.map(p=>pr(p[0],p[1]).join(",")).join(" ");
+el("polygon",{points:pts,fill:"#f4f9e8",stroke:"#8da36a","stroke-width":1.6},country);
+
+// карта ключей → объект
+const ALL={};
+STATIONS.forEach(s=>ALL[s.key]={...s,kind:"st"});
+BORDER.forEach(s=>ALL[s.key]={...s,kind:"b"});
+
+// линии
+const gLD=document.getElementById("linesDom"), gL5=document.getElementById("lines500"), gL3=document.getElementById("lines330"), gLB=document.getElementById("linesBorder");
+const GRP={dom:gLD,"500":gL5,"330":gL3,border:gLB};
+const LCOLOR={dom:"#d62728","500":"#9467bd","330":"#17becf",border:"#2ca02c"};
+LINES.forEach(([a,b,cat,kv,stat,label])=>{
+  const sa=ALL[a],sb=ALL[b];if(!sa||!sb)return;
+  const [x1,y1]=pr(sa.lon,sa.lat),[x2,y2]=pr(sb.lon,sb.lat);
+  const g=GRP[cat]||gLD;
+  let stroke,dash,width,op;
+  if(cat!=="border"){
+    if(stat==="project"){stroke="#ff7f0e";dash="6 5";width=1.8;op=.8;}
+    else if(stat==="old"){stroke="#999";dash="4 4";width=1.8;op=.7;}
+    else {stroke=LCOLOR[cat]||"#d62728";dash="";width:2.4;op:.75;}
+  }else{
+    if(stat==="project"){stroke="#ff7f0e";dash="6 5";width:2;op:.85;}
+    else if(stat==="old"){stroke="#999";dash="5 5";width:2;op:.75;}
+    else {stroke="#2ca02c";dash="";width:2.6;op:.85;}
+  }
+  el("line",{x1,y1,x2,y2,stroke,"stroke-width":width,"stroke-dasharray":dash,opacity:op},g);
+  // подпись напряжения в середине линии
+  const mx=(x1+x2)/2,my=(y1+y2)/2;
+  el("text",{x:mx+2,y:my-3,class:"kv-label"},g).textContent=label;
+});
+
+// маркеры и подписи
+const gM=document.getElementById("markers"),gL=document.getElementById("labels");
+const offSt={"zah":[-6,15],"vin":[-6,16],"kyi":[-6,15],"pivn":[-6,15],"dnp":[-6,16],"zap":[-6,16],"don":[-6,16],"pdd":[-46,16],"riv":[-6,16],"khm":[-6,16],"pua":[-48,16],"zae":[-6,16],"kah":[-6,16],"pry":[-6,16],"chn":[-48,-10]};
+Object.assign(offSt,{"krem":[-6,16],"don500":[-4,-10],"mikh":[-42,16],"kh330":[-56,-8],"zal":[8,18],"novk":[-6,-10],"zah330":[8,-8],"riv330":[-60,16],"loz":[-6,16],"mel":[-6,16],"noo":[-6,16]});
+const offB={"dobr":[-6,16],"zamo":[-4,-10],"rz":[-4,-10],"muk":[-6,16],"vkap":[-4,-10],"szab":[-4,-10],"isac":[-4,-10],"vulc":[-4,-10],"arc":[-6,16],"mgres":[-6,16]};
+function marker(s,i,kind){
+  const [x,y]=pr(s.lon,s.lat);
+  const g=el("g",{class:"marker"},gM);
+  el("title",{},g).textContent=s.ru+" — "+STATUS[s.type];
+  if(kind==="st"){
+    el("circle",{cx:x,cy:y,r:6.5,fill:COLOR[s.type],stroke:"#fff","stroke-width":2},g);
+    const off=offSt[s.key]||[-6,16];
+    el("text",{x:x+off[0],y:y+off[1],class:"lbl"},gL).textContent=s.short;
+  }else{
+    // ромб
+    const sz=5.5;
+    el("rect",{x:x-sz,y:y-sz,width:sz*2,height:sz*2,fill:COLOR[s.type],stroke:"#fff","stroke-width":1.6,transform:`rotate(45 ${x} ${y})`},g);
+    const off=offB[s.key]||[-6,16];
+    el("text",{x:x+off[0],y:y+off[1],class:"lbl",fill:"#165"},gL).textContent=s.short;
+  }
+  g.addEventListener("click",()=>showInfo(kind,i));
+}
+STATIONS.forEach((s,i)=>marker(s,i,"st"));
+BORDER.forEach((s,i)=>marker(s,i,"b"));
+
+// таблицы
+const tbSt=document.querySelector("#tblSt tbody");
+STATIONS.forEach((s,i)=>{
+  const tr=document.createElement("tr");
+  tr.innerHTML=`<td><b>${s.ru}</b></td><td>${s.region}</td><td><span class="status ${CLS[s.type]}">${STATUS[s.type]}</span></td>`;
+  tr.onclick=()=>showInfo("st",i);
+  tbSt.appendChild(tr);
+});
+const tbB=document.querySelector("#tblB tbody");
+BORDER.forEach((s,i)=>{
+  const tr=document.createElement("tr");
+  tr.innerHTML=`<td><b>${s.ru}</b></td><td>${s.country}</td><td>${s.kv}</td><td><span class="status ${CLS[s.type]}">${STATUS[s.type]}</span></td>`;
+  tr.onclick=()=>showInfo("b",i);
+  tbB.appendChild(tr);
+});
+
+function showInfo(kind,i){
+  const s=kind==="st"?STATIONS[i]:BORDER[i];
+  const extra=kind==="b"?`<div><span class="k">Напряжение:</span> ${s.kv}</div><div><span class="k">Направление:</span> ${s.country}</div>`:``;
+  document.getElementById("info").innerHTML=`
+    <h2>${s.ru}</h2>
+    <div><span class="k">${kind==="st"?"Регион":"Страна"}:</span> ${s.region||s.country}</div>
+    <div><span class="k">Статус:</span> ${STATUS[s.type]}</div>
+    ${extra}
+    <div><span class="k">Координаты:</span> ${s.lat.toFixed(5)}, ${s.lon.toFixed(5)}</div>
+    <div><span class="k">Точность:</span> ${s.accuracy}</div>
+    <div style="margin-top:8px;">${s.info}</div>`;
+}
+
+// зум через viewBox
+const svg=document.getElementById("map");
+let vb=[0,0,W,H];
+function setVB(){svg.setAttribute("viewBox",vb.join(" "));}
+document.getElementById("zin").onclick=()=>{vb=[vb[0]+W*.12,vb[1]+H*.12,vb[2]*.76,vb[3]*.76];setVB();};
+document.getElementById("zout").onclick=()=>{vb=[vb[0]-W*.08,vb[1]-H*.08,vb[2]*1.24,vb[3]*1.24];setVB();};
+document.getElementById("zreset").onclick=()=>{vb=[0,0,W,H];setVB();};
+</script>
+</body>
+</html>
